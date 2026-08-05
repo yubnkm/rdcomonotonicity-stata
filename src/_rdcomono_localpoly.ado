@@ -28,11 +28,15 @@ program define _rdcomono_localpoly, rclass
     /*
         The first variable is the outcome. The remaining variables are
         the training covariates.
+        e.g. varlist = "y x1 x2" then 
+            depvar = "y"
+            xvars  = "x1 x2"
     */
     gettoken depvar xvars : varlist
 
     /*
         Define the estimation sample and remove incomplete training rows.
+        markout: changes `touse' to 0 when an obs has missing values in the listed variables
     */
     marksample touse
     markout `touse' `depvar' `xvars'
@@ -54,8 +58,7 @@ program define _rdcomono_localpoly, rclass
     */
     foreach h of numlist `bandwidth' {
         if `h' <= 0 {
-            display as error ///
-                "all values in bandwidth() must be strictly positive"
+            display as error "all values in bandwidth() must be strictly positive"
             exit 198
         }
     }
@@ -67,8 +70,7 @@ program define _rdcomono_localpoly, rclass
     local n_bandwidths : word count `bandwidth'
 
     if `n_bandwidths' > 1 & `folds' < 2 {
-        display as error ///
-            "folds() must be at least 2 when bandwidth() contains multiple values"
+        display as error "folds() must be at least 2 when bandwidth() contains multiple values"
         exit 198
     }
 
@@ -82,8 +84,7 @@ program define _rdcomono_localpoly, rclass
     local kernel = lower("`kernel'")
 
     if !inlist("`kernel'", "gaussian", "uniform", "triangular") {
-        display as error ///
-            "kernel() must be gaussian, uniform, or triangular"
+        display as error "kernel() must be gaussian, uniform, or triangular"
         exit 198
     }
 
@@ -95,8 +96,7 @@ program define _rdcomono_localpoly, rclass
     local p_at    : word count `at'
 
     if `p_train' != `p_at' {
-        display as error ///
-            "at() must contain the same number of variables as the training covariates"
+        display as error "at() must contain the same number of variables as the training covariates"
         exit 198
     }
 
@@ -143,8 +143,7 @@ program define _rdcomono_localpoly, rclass
     quietly summarize `wvar' if `touse', meanonly
 
     if r(sum) <= 0 {
-        display as error ///
-            "wvar() must contain at least one strictly positive weight"
+        display as error "wvar() must contain at least one strictly positive weight"
         exit 198
     }
 
@@ -166,6 +165,7 @@ program define _rdcomono_localpoly, rclass
     }
 
     /*
+        Create a temporary scalar for the selected bandwidth
         A polynomial of total degree order in p variables contains
         choose(p + order, order) terms. Mata constructs this basis.
     */
@@ -207,7 +207,7 @@ mata set matastrict on
 
 
 /**********************************************************************
-Construct exponent vectors for a total-degree polynomial basis
+    Construct exponent vectors for a total-degree polynomial basis
 **********************************************************************/
 
 real matrix _rdcomono_exponent_matrix(
@@ -267,7 +267,7 @@ real matrix _rdcomono_exponent_matrix(
 
 
 /**********************************************************************
-Evaluate a multivariate polynomial basis
+    Evaluate a multivariate polynomial basis
 **********************************************************************/
 
 real matrix _rdcomono_polynomial_basis(
@@ -308,7 +308,7 @@ real matrix _rdcomono_polynomial_basis(
 
 
 /**********************************************************************
-Kernel-weight calculation
+    Kernel-weight calculation
 **********************************************************************/
 
 real colvector _rdcomono_kernel_weights(
@@ -346,7 +346,7 @@ real colvector _rdcomono_kernel_weights(
 
 
 /**********************************************************************
-Core multivariate local-polynomial predictor
+    Core multivariate local-polynomial predictor
 **********************************************************************/
 
 real colvector _rdcomono_poly_predict(
@@ -375,10 +375,6 @@ real colvector _rdcomono_poly_predict(
     real colvector weighted_outcome_crossproduct
     real colvector beta
 
-    /*
-        The MATLAB routine uses the same polynomial basis for all local
-        fits and changes only the kernel weights. We mirror that behavior.
-    */
     training_basis =
         _rdcomono_polynomial_basis(
             X,
@@ -399,12 +395,7 @@ real colvector _rdcomono_poly_predict(
         /*
             Kernel weights depend on distance from X_center[i,.].
         */
-        distance =
-            sqrt(
-                rowsum(
-                    (X :- X_center[i, .]) :^ 2
-                )
-            )
+        distance = sqrt(rowsum((X :- X_center[i, .]) :^ 2))
 
         kernel_weight =
             _rdcomono_kernel_weights(
@@ -499,19 +490,13 @@ real scalar _rdcomono_select_bandwidth(
     fold_size = floor(n / num_folds)
 
     /*
-        Reproduce the MATLAB strategy: shuffle observations, then form
-        consecutive equal-sized folds. Any remainder observations are
-        never validation observations but remain in complementary
-        training samples.
+        Suffle observations, then form consecutive equal-size folds.
+        Any remainder observations are never validation observations
+        but remain in complementray training samples.
     */
-    permutation =
-        order(
-            runiform(n, 1),
-            1
-        )
+    permutation = order(runiform(n, 1), 1)
 
-    cv_criterion =
-        J(cols(bandwidths), 1, .)
+    cv_criterion = J(cols(bandwidths), 1, .)
 
     for (
         bandwidth_index = 1;
@@ -605,7 +590,7 @@ real scalar _rdcomono_select_bandwidth(
 
 
 /**********************************************************************
-Main driver called by the ado program
+    Main driver called by the ado program
 **********************************************************************/
 
 void _rdcomono_localpoly_driver(
