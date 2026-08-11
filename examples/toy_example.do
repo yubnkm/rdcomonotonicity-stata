@@ -79,11 +79,25 @@ graph export "output/toy_design.png", replace width(1800)
 
 
 /**********************************************************************
-3. Estimate the comonotonic RD model
+3. Estimate the comonotonic RD model with multiplier bootstrap
 
-The bandwidth candidates match the R README:
-    seq(0.2, 0.6, length.out = 5)
+The bootstrap uses Exp(1) multiplier weights.  The toy example uses
+20 replications to keep execution time manageable.  Increase this to
+100 for the number of draws used in the paper.
 **********************************************************************/
+
+local boot_reps   100
+local boot_points 100
+local ci_pct      90
+
+/* Drop the bootstrap frame if this do-file was already run. */
+capture frame drop toy_bootstrap
+
+/*
+    Separate seed for bootstrap draws so that the multiplier draws are
+    reproducible independently of the simulated-data seed.
+*/
+set seed 24680
 
 rdcomono y x1 x2,                         ///
     treatment(D)                          ///
@@ -91,7 +105,10 @@ rdcomono y x1 x2,                         ///
     bandwidth(0.2 0.3 0.4 0.5 0.6)       ///
     kernel(gaussian)                      ///
     folds(5)                              ///
-    order(1)
+    order(1)                              ///
+    bootstrap(`boot_reps')                ///
+    bootframe(toy_bootstrap)              ///
+    bootpoints(`boot_points')
 
 /* Store returned results before another command overwrites r(). */
 scalar band0_used = r(band0)
@@ -100,14 +117,28 @@ scalar q0_band_used = r(q0_band)
 scalar q1_band_used = r(q1_band)
 scalar N_supported = r(N_supported)
 
+scalar bootstrap_reps_used = r(bootstrap_reps)
+scalar bootstrap_points_used = r(bootstrap_points)
+
+local bootstrap_frame "`r(bootstrap_frame)'"
+
 display as text _newline "Selected bandwidths"
 display as text "  g0 bandwidth: " as result %6.3f band0_used
 display as text "  g1 bandwidth: " as result %6.3f band1_used
 display as text "  q0 bandwidth: " as result %6.3f q0_band_used
 display as text "  q1 bandwidth: " as result %6.3f q1_band_used
-display as text "  supported observations: " as result %9.0f N_supported
+display as text "  supported observations: " ///
+    as result %9.0f N_supported
 
-/* Estimated conditional average treatment effect where it is supported. */
+display as text _newline "Bootstrap"
+display as text "  replications: " ///
+    as result %9.0f bootstrap_reps_used
+display as text "  q-grid points: " ///
+    as result %9.0f bootstrap_points_used
+display as text "  results frame: " ///
+    as result "`bootstrap_frame'"
+
+/* Estimated CATE where extrapolation is supported. */
 generate double tau_hat = y1_hat - y0_hat if supported == 1
 label variable tau_hat "Estimated E[Y(1)-Y(0)|X]"
 
@@ -137,91 +168,214 @@ graph export "output/toy_support.png", replace width(1800)
 
 
 /**********************************************************************
-5. Construct the q0 plot
+5. Construct q0 plot with 90% pointwise multiplier-bootstrap band
 
-For treated observations:
+The bootstrap frame contains:
 
-    y1_hat = estimated factual E[Y(1)|X]
-    y0_hat = q0(y1_hat)
+    _rdm_q0_grid       evaluation points y
+    _rdm_q0            original q0 estimate
+    _rdm_q0_1 ...      bootstrap q0 estimates
 
-Therefore, plotting y0_hat against y1_hat over supported treated
-observations displays the estimated q0 function.
+At each grid point we calculate
+
+    c(y) = 90th percentile of |q0_boot(y) - q0_hat(y)|
+
+and plot
+
+    q0_hat(y) +/- c(y).
 **********************************************************************/
 
-generate double q0_input = y1_hat if D == 1 & supported == 1
-generate double q0_estimate = y0_hat if D == 1 & supported == 1
+local mainframe "`c(frame)'"
 
-/* Population q0(y1) used by the toy DGP. */
-generate double q0_true_curve = 0.8 - 0.8*cos(q0_input)          ///
-    if !missing(q0_input)
-generate double q0_45_degree = q0_input if !missing(q0_input)
+capture frame drop toy_q0_ci
+frame copy `bootstrap_frame' toy_q0_ci
+frame change toy_q0_ci
 
-label variable q0_input "E[Y(1)|X]"
-label variable q0_estimate "Estimated q0"
+
+/* Keep only rows corresponding to the q0 grid. */
+keep if !missing(_rdm_q0_grid)
+
+
+/*
+    Rename the original curve before reshape so that only the
+    bootstrap variables match the _rdm_q0_ stub.
+*/
+rename _rdm_q0_grid q0_input
+rename _rdm_q0      q0_estimate
+
+keep q0_input q0_estimate _rdm_q0_*
+
+generate long q0_point = _n
+
+
+/*
+    Convert
+
+        _rdm_q0_1
+        _rdm_q0_2
+        ...
+        _rdm_q0_B
+
+    from wide bootstrap draws to one bootstrap observation per row.
+*/
+reshape long _rdm_q0_, i(q0_point) j(rep)
+
+
+/* Absolute bootstrap deviation from the original estimator. */
+generate double q0_absdev = ///
+    abs(_rdm_q0_ - q0_estimate)
+
+
+/*
+    90th percentile across bootstrap draws at each evaluation point.
+*/
+bysort q0_point: egen double q0_conf = ///
+    pctile(q0_absdev), p(`ci_pct')
+
+
+/*
+    q0_input, q0_estimate, and q0_conf are identical within each
+    q0_point after reshape, so retain one observation per point.
+*/
+bysort q0_point: keep if _n == 1
+
+
+/* Pointwise bootstrap confidence band. */
+generate double q0_lower = q0_estimate - q0_conf
+generate double q0_upper = q0_estimate + q0_conf
+
+
+/* Population q0(y1) from the toy DGP. */
+generate double q0_true_curve = ///
+    0.8 - 0.8*cos(q0_input)
+
+generate double q0_45_degree = q0_input
+
+
+label variable q0_input      "E[Y(1)|X]"
+label variable q0_estimate   "Estimated q0"
+label variable q0_lower      "90% lower band"
+label variable q0_upper      "90% upper band"
 label variable q0_true_curve "True q0"
 
-twoway                                                         ///
-    (line q0_estimate q0_input, sort lwidth(medthick))         ///
-    (line q0_true_curve q0_input, sort lpattern(dash)          ///
-        lwidth(medthick))                                      ///
-    (line q0_45_degree q0_input, sort lpattern(shortdash)),    ///
+
+twoway                                                        ///
+    (rarea q0_lower q0_upper q0_input, sort                  ///
+        fcolor(gs12%40) lcolor(none))                         ///
+    (line q0_estimate q0_input, sort                         ///
+        lwidth(medthick))                                     ///
+    (line q0_true_curve q0_input, sort                       ///
+        lpattern(dash) lwidth(medthick))                      ///
+    (line q0_45_degree q0_input, sort                        ///
+        lpattern(shortdash)),                                 ///
     title("Estimated q0 function")                            ///
-    subtitle("No bootstrap confidence band")                  ///
-    xtitle("E[Y(1)|X = x]")                                  ///
-    ytitle("E[Y(0)|X = x]")                                  ///
-    legend(order(1 "Estimated q0" 2 "True q0"               ///
-        3 "45-degree line"))                                  ///
+    subtitle("90% pointwise multiplier-bootstrap band")       ///
+    xtitle("E[Y(1)|X = x]")                                   ///
+    ytitle("E[Y(0)|X = x]")                                   ///
+    legend(order(                                              ///
+        1 "90% bootstrap band"                                ///
+        2 "Estimated q0"                                      ///
+        3 "True q0"                                           ///
+        4 "45-degree line"))                                  ///
     name(q0_plot, replace)
 
 graph display q0_plot
 graph export "output/toy_q0.png", replace width(1800)
 
 
+/* Return to the original toy-data frame. */
+frame change `mainframe'
+
 /**********************************************************************
-6. Construct the q1 plot
-
-For untreated observations:
-
-    y0_hat = estimated factual E[Y(0)|X]
-    y1_hat = q1(y0_hat)
-
-Therefore, plotting y1_hat against y0_hat over supported untreated
-observations displays the estimated q1 function.
+6. Construct q1 plot with 90% pointwise multiplier-bootstrap band
 **********************************************************************/
 
-generate double q1_input = y0_hat if D == 0 & supported == 1
-generate double q1_estimate = y1_hat if D == 0 & supported == 1
+capture frame drop toy_q1_ci
+frame copy `bootstrap_frame' toy_q1_ci
+frame change toy_q1_ci
+
+
+/* Keep only rows corresponding to the q1 grid. */
+keep if !missing(_rdm_q1_grid)
+
+
+rename _rdm_q1_grid q1_input
+rename _rdm_q1      q1_estimate
+
+keep q1_input q1_estimate _rdm_q1_*
+
+generate long q1_point = _n
+
+
+/* Put bootstrap replications into long format. */
+reshape long _rdm_q1_, i(q1_point) j(rep)
+
+
+/* Absolute bootstrap deviation. */
+generate double q1_absdev = ///
+    abs(_rdm_q1_ - q1_estimate)
+
+
+/* 90% pointwise critical value. */
+bysort q1_point: egen double q1_conf = ///
+    pctile(q1_absdev), p(`ci_pct')
+
+
+/* Retain one row for each q1 evaluation point. */
+bysort q1_point: keep if _n == 1
+
+
+/* Pointwise bootstrap confidence band. */
+generate double q1_lower = q1_estimate - q1_conf
+generate double q1_upper = q1_estimate + q1_conf
+
 
 /*
-Population q1(y0), the inverse of q0. The inner max/min operation prevents
-small numerical errors from sending the argument of acos() outside [-1,1].
-*/
-generate double q1_acos_argument =                         ///
-    max(-1, min(1, 1 - q1_input/0.8))                     ///
-    if !missing(q1_input)
-generate double q1_true_curve = acos(q1_acos_argument)    ///
-    if !missing(q1_acos_argument)
-generate double q1_45_degree = q1_input if !missing(q1_input)
+    Population q1(y0), which is the inverse of
 
-label variable q1_input "E[Y(0)|X]"
-label variable q1_estimate "Estimated q1"
+        q0(y1) = 0.8 - 0.8*cos(y1).
+*/
+generate double q1_acos_argument = ///
+    max(-1, min(1, 1 - q1_input/0.8))
+
+generate double q1_true_curve = ///
+    acos(q1_acos_argument)
+
+generate double q1_45_degree = q1_input
+
+
+label variable q1_input      "E[Y(0)|X]"
+label variable q1_estimate   "Estimated q1"
+label variable q1_lower      "90% lower band"
+label variable q1_upper      "90% upper band"
 label variable q1_true_curve "True q1"
 
-twoway                                                         ///
-    (line q1_estimate q1_input, sort lwidth(medthick))         ///
-    (line q1_true_curve q1_input, sort lpattern(dash)          ///
-        lwidth(medthick))                                      ///
-    (line q1_45_degree q1_input, sort lpattern(shortdash)),    ///
+
+twoway                                                        ///
+    (rarea q1_lower q1_upper q1_input, sort                  ///
+        fcolor(gs12%40) lcolor(none))                         ///
+    (line q1_estimate q1_input, sort                         ///
+        lwidth(medthick))                                     ///
+    (line q1_true_curve q1_input, sort                       ///
+        lpattern(dash) lwidth(medthick))                      ///
+    (line q1_45_degree q1_input, sort                        ///
+        lpattern(shortdash)),                                 ///
     title("Estimated q1 function")                            ///
-    subtitle("No bootstrap confidence band")                  ///
-    xtitle("E[Y(0)|X = x]")                                  ///
-    ytitle("E[Y(1)|X = x]")                                  ///
-    legend(order(1 "Estimated q1" 2 "True q1"               ///
-        3 "45-degree line"))                                  ///
+    subtitle("90% pointwise multiplier-bootstrap band")       ///
+    xtitle("E[Y(0)|X = x]")                                   ///
+    ytitle("E[Y(1)|X = x]")                                   ///
+    legend(order(                                              ///
+        1 "90% bootstrap band"                                ///
+        2 "Estimated q1"                                      ///
+        3 "True q1"                                           ///
+        4 "45-degree line"))                                  ///
     name(q1_plot, replace)
 
 graph display q1_plot
 graph export "output/toy_q1.png", replace width(1800)
+
+
+frame change `mainframe'
 
 
 /**********************************************************************

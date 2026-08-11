@@ -9,6 +9,7 @@ program define _rdcomono_bootstrap_refit, rclass
             - opposite-side nearest neighbors;
             - distances to opposite-side neighbors;
             - W0 and W1.
+        -> Calculate nearest neighbor once! ... it doesn't depend on weights
 
         Those objects depend only on X, D, and the original first-stage
         bandwidths, so they are fixed across multiplier-bootstrap draws.
