@@ -1,4 +1,4 @@
-*! version 0.1.0 05aug2026
+*! version 0.2.0 11aug2026
 program define rdcomono, rclass
     version 17.0
 
@@ -13,10 +13,8 @@ program define rdcomono, rclass
           3. form generated regressors near the frontier;
           4. estimate q1(g0) and q0(g1);
           5. impute observation-level conditional mean potential outcomes;
-          6. construct the support indicator S.
-
-        Excluded in this first version
-            - bootstrap: will make an additional ,boot() type modification
+          6. construct the support indicator S;
+          7. Optionally performs multiplier bootstrap inference.
     */
 
     syntax varlist(min=2 numeric) [if] [in],                 ///
@@ -26,8 +24,10 @@ program define rdcomono, rclass
         [ WVAR(varname numeric)                              ///
           KERNEL(string)                                    ///
           FOLDS(integer 5)                                  ///
-          ORDER(integer 1) ]
-
+          ORDER(integer 1)                                  ///
+          BOOTstrap(integer 0)                              ///
+          BOOTFRAME(name)                                   ///
+          BOOTPOINTS(integer 100) ]
     /*
         The first variable is the outcome. The remaining variables are the
         assignment variables/covariates X.
@@ -101,6 +101,30 @@ program define rdcomono, rclass
         display as error ///
             "kernel() must be gaussian, uniform, or triangular"
         exit 198
+    }
+
+    /*
+        Bootstrap validation.
+    */
+    if `bootstrap' < 0 {
+        display as error "bootstrap() must be nonnegative"
+        exit 198
+    }
+
+    if `bootstrap' > 0 & `bootpoints' < 2 {
+        display as error ///
+            "bootpoints() must be at least 2"
+        exit 198
+    }
+
+    if `bootstrap' == 0 & "`bootframe'" != "" {
+        display as error ///
+            "bootframe() requires bootstrap()"
+        exit 198
+    }
+
+    if `bootstrap' > 0 & "`bootframe'" == "" {
+        local bootframe "rdcomono_bootstrap"
     }
 
     /*
@@ -492,6 +516,72 @@ program define rdcomono, rclass
     quietly count if `touse' & `support_name' == 1
     local n_supported = r(N)
 
+    /******************************************************************
+    Multiplier bootstrap
+    ******************************************************************/
+
+    local bootstrap_frame ""
+
+    tempname bootstrap_q0_bands
+    tempname bootstrap_q1_bands
+
+    if `bootstrap' > 0 {
+
+        /*
+            Convert temporary scalars to numerical locals before passing
+            them to the bootstrap program.
+        */
+        local band0_value   = scalar(`band0_scalar')
+        local band1_value   = scalar(`band1_scalar')
+
+        local q0_band_value = scalar(`q0_band_scalar')
+        local q1_band_value = scalar(`q1_band_scalar')
+
+        local y0_min_value  = scalar(`y0_min_scalar')
+        local y0_max_value  = scalar(`y0_max_scalar')
+
+        local y1_min_value  = scalar(`y1_min_scalar')
+        local y1_max_value  = scalar(`y1_max_scalar')
+
+        /*
+            The nearest-neighbor variables and W0/W1 have already been
+            constructed by the point estimator. They are reused in every
+            bootstrap replication.
+        */
+        quietly _rdcomono_bootstrap `depvar' `xvars'          ///
+            if `touse',                                      ///
+            treatment(`treatment')                           ///
+            basey0(`y0_name')                                ///
+            basey1(`y1_name')                                ///
+            support(`support_name')                          ///
+            g0boundary(`g0_boundary')                        ///
+            g1boundary(`g1_boundary')                        ///
+            band0(`band0_value')                             ///
+            band1(`band1_value')                             ///
+            q0band(`q0_band_value')                          ///
+            q1band(`q1_band_value')                          ///
+            y0min(`y0_min_value')                            ///
+            y0max(`y0_max_value')                            ///
+            y1min(`y1_min_value')                            ///
+            y1max(`y1_max_value')                            ///
+            nearest0(`nearest0_vars')                        ///
+            nearest1(`nearest1_vars')                        ///
+            w0(`W0')                                         ///
+            w1(`W1')                                         ///
+            wvar(`wvar')                                     ///
+            reps(`bootstrap')                                ///
+            frame(`bootframe')                               ///
+            points(`bootpoints')                             ///
+            kernel(`kernel')                                 ///
+            folds(`folds')                                   ///
+            order(`order')
+
+        local bootstrap_frame "`r(frame)'"
+
+        matrix `bootstrap_q0_bands' = r(q0_bands)
+        matrix `bootstrap_q1_bands' = r(q1_bands)
+    }
+
     /*
         Returned results for testing and later postestimation commands.
     */
@@ -524,6 +614,22 @@ program define rdcomono, rclass
     return local supportvar "`support_name'"
     return local candidate_bandwidths "`bandwidth'"
 
+    return scalar bootstrap_reps = `bootstrap'
+
+    if `bootstrap' > 0 {
+
+        return scalar bootstrap_points = `bootpoints'
+
+        return matrix bootstrap_q0_bands = ///
+            `bootstrap_q0_bands'
+
+        return matrix bootstrap_q1_bands = ///
+            `bootstrap_q1_bands'
+
+        return local bootstrap_frame ///
+            "`bootstrap_frame'"
+    }
+
     display as text _newline "Comonotonic RD extrapolation"
     display as text "  complete observations: " as result %10.0f `n_complete'
     display as text "  untreated / treated:  " as result ///
@@ -533,6 +639,16 @@ program define rdcomono, rclass
     display as text "  first-stage bandwidths:" as result ///
         %10.6f scalar(`band0_scalar') " / " ///
         %10.6f scalar(`band1_scalar')
+    if `bootstrap' > 0 {
+
+        display as text ///
+            "  bootstrap replications:" ///
+            as result %10.0f `bootstrap'
+
+        display as text ///
+            "  bootstrap frame:       " ///
+            as result "`bootstrap_frame'"
+    }
 end
 
 
