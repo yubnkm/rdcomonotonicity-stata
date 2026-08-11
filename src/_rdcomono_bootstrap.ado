@@ -105,10 +105,7 @@ program define _rdcomono_bootstrap, rclass
         Avoid duplicate variables in frame put.
     */
     local copyvars ///
-        "`depvar' `xvars' `treatment' `wvar' " ///
-        "`nearest0' `nearest1' `w0' `w1' " ///
-        "`g0boundary' `g1boundary' " ///
-        "`basey0' `basey1' `support'"
+    "`depvar' `xvars' `treatment' `wvar' `nearest0' `nearest1' `w0' `w1' `g0boundary' `g1boundary' `basey0' `basey1' `support'"
 
     local copyvars : list uniq copyvars
 
