@@ -16,7 +16,7 @@ The example:
     1. simulates the toy data;
     2. estimates the model with rdcomono;
     3. plots the treatment frontier and identified region;
-    4. plots q0 and q1 without bootstrap confidence bands.
+    4. plots q0 and q1 with bootstrap confidence bands.
 
 Run this do-file from the root of the Stata package repository, where the
 internal ado-files are stored in the src/ directory.
@@ -75,14 +75,14 @@ twoway                                                      ///
     name(toy_design, replace)
 
 graph display toy_design
-graph export "output/toy_design.png", replace width(1800)
+graph export "output/toy_example/toy_design.png", replace width(1800)
 
 
 /**********************************************************************
 3. Estimate the comonotonic RD model with multiplier bootstrap
 
 The bootstrap uses Exp(1) multiplier weights.  The toy example uses
-20 replications to keep execution time manageable.  Increase this to
+100 replications to keep execution time manageable.  Increase this to
 100 for the number of draws used in the paper.
 **********************************************************************/
 
@@ -164,7 +164,7 @@ twoway                                                          ///
     name(toy_support, replace)
 
 graph display toy_support
-graph export "output/toy_support.png", replace width(1800)
+graph export "output/toy_example/toy_support.png", replace width(1800)
 
 
 /**********************************************************************
@@ -261,26 +261,29 @@ label variable q0_true_curve "True q0"
 
 twoway                                                        ///
     (rarea q0_lower q0_upper q0_input, sort                  ///
-        fcolor(gs12%40) lcolor(none))                         ///
+        fcolor(gs10)                                         ///
+        fintensity(100)                                      ///
+        lcolor(gs10)                                         ///
+        lwidth(vthin))                                       ///
     (line q0_estimate q0_input, sort                         ///
-        lwidth(medthick))                                     ///
+        lwidth(medthick))                                    ///
     (line q0_true_curve q0_input, sort                       ///
-        lpattern(dash) lwidth(medthick))                      ///
+        lpattern(dash) lwidth(medthick))                     ///
     (line q0_45_degree q0_input, sort                        ///
-        lpattern(shortdash)),                                 ///
+        lpattern(shortdash)),                                ///
     title("Estimated q0 function")                            ///
     subtitle("90% pointwise multiplier-bootstrap band")       ///
-    xtitle("E[Y(1)|X = x]")                                   ///
-    ytitle("E[Y(0)|X = x]")                                   ///
-    legend(order(                                              ///
-        1 "90% bootstrap band"                                ///
-        2 "Estimated q0"                                      ///
-        3 "True q0"                                           ///
-        4 "45-degree line"))                                  ///
+    xtitle("E[Y(1)|X = x]")                                  ///
+    ytitle("E[Y(0)|X = x]")                                  ///
+    legend(order(                                             ///
+        1 "90% bootstrap band"                               ///
+        2 "Estimated q0"                                     ///
+        3 "True q0"                                          ///
+        4 "45-degree line"))                                 ///
     name(q0_plot, replace)
 
 graph display q0_plot
-graph export "output/toy_q0.png", replace width(1800)
+graph export "output/toy_example/toy_q0.png", replace width(1800)
 
 
 /* Return to the original toy-data frame. */
@@ -353,26 +356,29 @@ label variable q1_true_curve "True q1"
 
 twoway                                                        ///
     (rarea q1_lower q1_upper q1_input, sort                  ///
-        fcolor(gs12%40) lcolor(none))                         ///
+        fcolor(gs10)                                         ///
+        fintensity(100)                                      ///
+        lcolor(gs10)                                         ///
+        lwidth(vthin))                                       ///
     (line q1_estimate q1_input, sort                         ///
-        lwidth(medthick))                                     ///
+        lwidth(medthick))                                    ///
     (line q1_true_curve q1_input, sort                       ///
-        lpattern(dash) lwidth(medthick))                      ///
+        lpattern(dash) lwidth(medthick))                     ///
     (line q1_45_degree q1_input, sort                        ///
-        lpattern(shortdash)),                                 ///
+        lpattern(shortdash)),                                ///
     title("Estimated q1 function")                            ///
     subtitle("90% pointwise multiplier-bootstrap band")       ///
-    xtitle("E[Y(0)|X = x]")                                   ///
-    ytitle("E[Y(1)|X = x]")                                   ///
-    legend(order(                                              ///
-        1 "90% bootstrap band"                                ///
-        2 "Estimated q1"                                      ///
-        3 "True q1"                                           ///
-        4 "45-degree line"))                                  ///
+    xtitle("E[Y(0)|X = x]")                                  ///
+    ytitle("E[Y(1)|X = x]")                                  ///
+    legend(order(                                             ///
+        1 "90% bootstrap band"                               ///
+        2 "Estimated q1"                                     ///
+        3 "True q1"                                          ///
+        4 "45-degree line"))                                 ///
     name(q1_plot, replace)
 
 graph display q1_plot
-graph export "output/toy_q1.png", replace width(1800)
+graph export "output/toy_example/toy_q1.png", replace width(1800)
 
 
 frame change `mainframe'
@@ -388,7 +394,7 @@ graph combine q0_plot q1_plot,                               ///
     name(q_plots, replace)
 
 graph display q_plots
-graph export "output/toy_q0_q1.png", replace width(2400)
+graph export "output/toy_example/toy_q0_q1.png", replace width(2400)
 
 
 /**********************************************************************
@@ -413,8 +419,8 @@ display as text "  RMSE for E[Y(1)|X]: " as result %9.5f rmse_y1
 
 display as result _newline "Toy example completed."
 display as text "Graphs were saved in the output/ directory:"
-display as text "  output/toy_design.png"
-display as text "  output/toy_support.png"
-display as text "  output/toy_q0.png"
-display as text "  output/toy_q1.png"
-display as text "  output/toy_q0_q1.png"
+display as text "  output/toy_example/toy_design.png"
+display as text "  output/toy_example/toy_support.png"
+display as text "  output/toy_example/toy_q0.png"
+display as text "  output/toy_example/toy_q1.png"
+display as text "  output/toy_example/toy_q0_q1.png"
