@@ -110,6 +110,8 @@ rdcomono y x1 x2,                         ///
     bootframe(toy_bootstrap)              ///
     bootpoints(`boot_points')
 
+rdcomono_qplot, frame(toy_bootstrap)
+/*
 /* Store returned results before another command overwrites r(). */
 scalar band0_used = r(band0)
 scalar band1_used = r(band1)
@@ -424,3 +426,4 @@ display as text "  output/toy_example/toy_support.png"
 display as text "  output/toy_example/toy_q0.png"
 display as text "  output/toy_example/toy_q1.png"
 display as text "  output/toy_example/toy_q0_q1.png"
+*/
