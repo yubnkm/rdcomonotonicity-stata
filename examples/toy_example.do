@@ -110,7 +110,21 @@ rdcomono y x1 x2,                         ///
     bootframe(toy_bootstrap)              ///
     bootpoints(`boot_points')
 
+
+/**********************************************************************
+4. q0, q1, and combinded plot
+**********************************************************************/
+
 rdcomono_qplot, frame(toy_bootstrap)
+
+/**********************************************************************
+5. Identified region - same with step 2 but with rdcomono_idplot
+**********************************************************************/
+
+rdcomono_idplot x1 x2,
+    treatment(D)                        ///
+    support(supported)                  ///
+    name(idplot)
 
 /**********************************************************************
 8. Informal accuracy summaries
