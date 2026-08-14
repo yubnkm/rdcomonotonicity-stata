@@ -48,8 +48,7 @@ program define rdcomono_qplot, rclass
 
     syntax, FRAME(name)                                      ///
         [ LEVEL(real 90)                                     ///
-          PREFIX(name)                                       ///
-          NOCOMBINE ]
+          PREFIX(name) ]
 
 
     /*
@@ -105,7 +104,6 @@ program define rdcomono_qplot, rclass
     local q0_graph      "`prefix'_q0"
     local q1_graph      "`prefix'_q1"
     local compare_graph "`prefix'_compare"
-    local combined_graph "`prefix'_qplots"
 
 
 
@@ -872,7 +870,7 @@ program define rdcomono_qplot, rclass
             lcolor(gs6)                                  ///
             lpattern(dash)                               ///
             lwidth(thin)),                               ///
-        title("Comparison of q1 and q0 inverse")          ///
+        title("Comparison of q1 and q0^{-1}")          ///
         xtitle("E[Y(0)|X = x]")                          ///
         ytitle("E[Y(1)|X = x]")                          ///
         legend(order(                                    ///
@@ -880,35 +878,8 @@ program define rdcomono_qplot, rclass
             2 "Estimated q0 inverse"))                   ///
         name(`compare_graph', replace)
 
-
-
-    /******************************************************************
-    22. Optionally combine q0 and q1 plots
-    ******************************************************************/
-
-    /*
-        By default, also construct one graph containing the q0 and q1
-        panels.
-
-        The user can suppress this with
-
-            nocombine
-    */
-
-    if "`nocombine'" == "" {
-
-        graph combine                              ///
-            `q0_graph'                             ///
-            `q1_graph',                            ///
-            cols(2)                                ///
-            title("Estimated comonotonic mappings") ///
-            name(`combined_graph', replace)
-    }
-
-
-
-    /******************************************************************
-    23. Remove temporary frames
+  /******************************************************************
+    22. Remove temporary frames
     ******************************************************************/
 
     /*
@@ -922,7 +893,7 @@ program define rdcomono_qplot, rclass
 
 
     /******************************************************************
-    24. Return results
+    23. Return results
     ******************************************************************/
 
     return scalar level = `level'
@@ -944,13 +915,6 @@ program define rdcomono_qplot, rclass
 
     return local comparison_graph ///
         "`compare_graph'"
-
-
-    if "`nocombine'" == "" {
-
-        return local combined_graph ///
-            "`combined_graph'"
-    }
 
 
 
@@ -984,13 +948,5 @@ program define rdcomono_qplot, rclass
     display as text ///
         "  comparison graph:     " ///
         as result "`compare_graph'"
-
-
-    if "`nocombine'" == "" {
-
-        display as text ///
-            "  combined graph:       " ///
-            as result "`combined_graph'"
-    }
 
 end
