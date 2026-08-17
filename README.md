@@ -166,11 +166,11 @@ rdcomono y x1 x2,                         ///
 
 The variables created by `generate()` are:
 
-| Variable    | Description                     |
-| :---------- | :------------------------------ |
-| `y0_hat`    | Estimated (E[Y(0)\mid X])       |
-| `y1_hat`    | Estimated (E[Y(1)\mid X])       |
-| `supported` | Estimated support indicator (S) |
+| Variable    | Description                       |
+| :---------- | :---------------------------------|
+| `y0_hat`    | Estimated $$E[Y(0)\mid X]$$       |
+| `y1_hat`    | Estimated $$E[Y(1)\mid X]$$       |
+| `supported` | Estimated support indicator $$S$$ |
 
 The support indicator `supported` equals one when the observation's factual conditional mean lies within the estimated domain of the relevant counterfactual mapping.
 
@@ -267,7 +267,7 @@ A counterfactual policy is fully identified when the treatment changes induced b
 Consider a counterfactual policy that shifts the treatment frontier upward by 0.05:
 
 $$
-D^{\mathrm{counterfactual}} = \mathbf{1} \left{ X_2 < 0.7 - 0.4X_1 + 0.05 \right}.
+D^{\mathrm{counterfactual}} = \mathbf{1} \{ X_2 < 0.7 - 0.4X_1 + 0.05 \}.
 $$
 
 This policy expands treatment to observations immediately above the original treatment frontier.
