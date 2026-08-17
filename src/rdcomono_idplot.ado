@@ -210,29 +210,29 @@ program define rdcomono_idplot, rclass
         `touse' &                                           ///
         `treatment' == 0 &                                  ///
         `support' == 0,                                     ///
-        msymbol(Oh)                                         ///
-        msize(vsmall)                                       ///
+        msymbol(x)                                         ///
+        msize(medsmall)                                       ///
         mcolor(blue))                                       ///
     (scatter `x2' `x1' if                                   ///
         `touse' &                                           ///
         `treatment' == 0 &                                  ///
         `support' == 1,                                     ///
-        msymbol(x)                                          ///
-        msize(vsmall)                                       ///
+        msymbol(Oh)                                          ///
+        msize(small)                                       ///
         mcolor(blue))                                       ///
     (scatter `x2' `x1' if                                   ///
         `touse' &                                           ///
         `treatment' == 1 &                                  ///
         `support' == 0,                                     ///
-        msymbol(Oh)                                         ///
-        msize(vsmall)                                       ///
+        msymbol(x)                                         ///
+        msize(medsmall)                                       ///
         mcolor(red))                                        ///
     (scatter `x2' `x1' if                                   ///
         `touse' &                                           ///
         `treatment' == 1 &                                  ///
         `support' == 1,                                     ///
-        msymbol(x)                                          ///
-        msize(vsmall)                                       ///
+        msymbol(Oh)                                          ///
+        msize(small)                                       ///
         mcolor(red)),                                       ///
     title(`title', size(medsmall))                           ///
     xtitle(`"`x1_label'"', size(small))                      ///

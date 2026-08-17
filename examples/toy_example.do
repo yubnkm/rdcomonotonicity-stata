@@ -118,10 +118,10 @@ rdcomono y x1 x2,                         ///
 rdcomono_qplot, frame(toy_bootstrap)
 
 /**********************************************************************
-5. Identified region - same with step 2 but with rdcomono_idplot
+5. Identified region 
 **********************************************************************/
 
-rdcomono_idplot x1 x2,
+rdcomono_idplot x1 x2,                  ///
     treatment(D)                        ///
     support(supported)                  ///
     name(idplot)
