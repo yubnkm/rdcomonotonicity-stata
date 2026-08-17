@@ -28,7 +28,7 @@ capture mkdir "output"
 
 
 /**********************************************************************
-1. Construct the toy data
+    Construct the toy example data
 **********************************************************************/
 
 set seed 1
@@ -55,7 +55,7 @@ label values D treatment_label
 
 
 /**********************************************************************
-2. Plot the simulated RDD design
+    Plot the simulated RDD design
 **********************************************************************/
 
 twoway                                                      ///
@@ -79,11 +79,7 @@ graph export "output/toy_example/toy_design.png", replace width(1800)
 
 
 /**********************************************************************
-3. Estimate the comonotonic RD model with multiplier bootstrap
-
-The bootstrap uses Exp(1) multiplier weights.  The toy example uses
-100 replications to keep execution time manageable.  Increase this to
-100 for the number of draws used in the paper.
+    Estimate the comonotonic RD model with multiplier bootstrap
 **********************************************************************/
 
 local boot_reps   100
@@ -93,10 +89,6 @@ local ci_pct      90
 /* Drop the bootstrap frame if this do-file was already run. */
 capture frame drop toy_bootstrap
 
-/*
-    Separate seed for bootstrap draws so that the multiplier draws are
-    reproducible independently of the simulated-data seed.
-*/
 set seed 24680
 
 rdcomono y x1 x2,                         ///
@@ -112,19 +104,93 @@ rdcomono y x1 x2,                         ///
 
 
 /**********************************************************************
-4. q0, q1, and combinded plot
+    q0, q1, and combinded plot
 **********************************************************************/
 
 rdcomono_qplot, frame(toy_bootstrap)
 
 /**********************************************************************
-5. Identified region 
+    Identified region 
 **********************************************************************/
 
 rdcomono_idplot x1 x2,                  ///
     treatment(D)                        ///
     support(supported)                  ///
     name(idplot)
+
+/**********************************************************************
+    Counterfactual policy effect
+    - Original policy: D = 1{x2 < 0.7 - 0.4*x1}
+    - Counterfactual policy: D_cf = 1{x2 < 0.7 - 0.4*x1 + 0.05}
+**********************************************************************/
+
+    local delta = 0.05
+    generate byte D_counterfactual = x2 < (0.7 - 0.4*x1 + `delta')
+    label variable D_counterfactual "Treatment under counterfactual policy"
+
+rdcomono_policy y,                            ///
+    treatment(D)                              ///
+    policy(D_counterfactual)                  ///
+    y0(y0_hat)                                ///
+    y1(y1_hat)                                ///
+    support(supported)                        ///
+    bootframe(toy_bootstrap)                  ///
+    level(90)
+
+scalar policy_estimate = r(estimate)
+scalar policy_ci_low = r(conf_low)
+scalar policy_ci_high = r(conf_high)
+scalar policy_identified_n = r(N_supported)
+scalar policy_num_affected = r(num_affected)
+scalar policy_affected_share = r(affected_share)
+
+
+/*
+    True counterfactual policy effect to compare with the estimate
+*/
+
+generate double true_counterfactual_mean = cond(D_counterfactual == 1, mu1, mu0)
+generate double true_policy_change = true_counterfactual_mean - factual_mean if supported == 1
+quietly summarize true_policy_change if supported == 1, meanonly
+scalar true_policy_effect = r(mean)
+
+/*
+    Display comparison
+*/
+
+display as text _newline "============================================================"
+display as text "Counterfactual policy: frontier shifted upward by 0.05"
+display as text "============================================================"
+
+
+display as text ///
+    "True policy effect:              " ///
+    as result %10.6f true_policy_effect
+
+display as text ///
+    "Estimated policy effect:         " ///
+    as result %10.6f policy_estimate
+
+display as text ///
+    "90% bootstrap confidence interval: [" ///
+    as result %10.6f policy_ci_low ///
+    as text ", " ///
+    as result %10.6f policy_ci_high ///
+    as text "]"
+
+display as text ///
+    "Observations with S = 1:         " ///
+    as result %10.0f policy_identified_n
+
+display as text ///
+    "Number affected by policy:       " ///
+    as result %10.0f policy_num_affected
+
+display as text ///
+    "Affected share among S = 1:      " ///
+    as result %10.4f policy_affected_share
+
+display as text "============================================================"
 
 /**********************************************************************
 8. Informal accuracy summaries

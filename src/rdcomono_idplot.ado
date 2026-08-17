@@ -29,16 +29,7 @@ program define rdcomono_idplot, rclass
           TITLE(string asis) ]
 
 
-    /******************************************************************
-    1. Parse the two assignment variables
-    ******************************************************************/
-
     gettoken x1 x2 : varlist
-
-
-    /******************************************************************
-    2. Define the plotting sample
-    ******************************************************************/
 
     marksample touse
 
@@ -64,47 +55,7 @@ program define rdcomono_idplot, rclass
 
 
     /******************************************************************
-    3. Validate treatment and support indicators
-    ******************************************************************/
-
-    /*
-        Treatment must be binary.
-    */
-
-    quietly count if ///
-        `touse' & ///
-        !inlist(`treatment', 0, 1)
-
-
-    if r(N) > 0 {
-
-        display as error ///
-            "treatment() must equal 0 or 1 in the plotting sample"
-
-        exit 198
-    }
-
-
-    /*
-        The rdcomono support indicator must also be binary.
-    */
-
-    quietly count if ///
-        `touse' & ///
-        !inlist(`support', 0, 1)
-
-
-    if r(N) > 0 {
-
-        display as error ///
-            "support() must equal 0 or 1 in the plotting sample"
-
-        exit 198
-    }
-
-
-    /******************************************************************
-    4. Graph labels and graph name
+        Graph labels and graph name
     ******************************************************************/
 
     /*
@@ -128,17 +79,12 @@ program define rdcomono_idplot, rclass
 
 
     /*
-        Default graph name.
+        Default 
     */
 
     if "`name'" == "" {
         local name "rdcomono_idplot"
     }
-
-
-    /*
-        Default graph title.
-    */
 
     if `"`title'"' == "" {
 
@@ -148,7 +94,7 @@ program define rdcomono_idplot, rclass
 
 
     /******************************************************************
-    5. Count observations by identification and treatment status
+        Count observations by identification and treatment status
     ******************************************************************/
 
     quietly count if ///
@@ -180,30 +126,8 @@ program define rdcomono_idplot, rclass
 
 
     /******************************************************************
-    6. Plot identified and unidentified observations
+        Plot identified and unidentified observations
     ******************************************************************/
-
-    /*
-        The R implementation maps:
-
-            color -> treatment region
-            shape -> CATE identification
-
-        Stata legends are plot-based rather than aesthetic-based.
-
-        Therefore, the four treatment-by-identification combinations
-        are plotted separately:
-
-            untreated, not identified
-            untreated, identified
-            treated, not identified
-            treated, identified
-
-        Marker conventions follow the R function:
-
-            Not identified: open circle
-            Identified:     x
-    */
 
     twoway                                                        ///
     (scatter `x2' `x1' if                                   ///
@@ -252,40 +176,27 @@ legend(order(                                               ///
 
 
     /******************************************************************
-    7. Return plotting information
+        Return plotting information
     ******************************************************************/
 
     return scalar N = `N'
-
     return scalar N0 = `N0'
     return scalar N1 = `N1'
 
-    return scalar N_identified = ///
-        `N_identified'
+    return scalar N_identified = `N_identified'
+    return scalar N_notidentified = `N_notidentified'
 
-    return scalar N_notidentified = ///
-        `N_notidentified'
-
-
-    return local xvars ///
-        "`x1' `x2'"
-
-    return local treatment ///
-        "`treatment'"
-
-    return local support ///
-        "`support'"
-
-    return local graph ///
-        "`name'"
+    return local xvars "`x1' `x2'"
+    return local treatment "`treatment'"
+    return local support "`support'"
+    return local graph "`name'"
 
 
     /******************************************************************
-    8. Display summary
+        Display summary
     ******************************************************************/
 
-    display as text _newline ///
-        "rdcomono identified-region plot"
+    display as text _newline "rdcomono identified-region plot"
 
     display as text ///
         "  observations:          " ///

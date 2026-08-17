@@ -21,45 +21,13 @@ program define rdcomono_qplot, rclass
             3. comparison plot:
                    q1 versus q0^{-1}
 
-        The bootstrap confidence bands are pointwise bands:
-
-            c_d(y)
-              = level-th percentile of
-                |q_d^b(y) - q_d(y)|
-
-        and the plotted interval is
-
-            q_d(y) +/- c_d(y).
-
-        IMPORTANT:
-        This first version requires bootstrap results.  It therefore
-        requires frame(), where frame() is the bootstrap frame returned
-        by rdcomono.
-
-        showpoints is not implemented yet because the second-stage
-        training data are not currently stored with stable public names
-        in the bootstrap frame.
     */
 
-
-    /******************************************************************
-    1. Parse syntax
-    ******************************************************************/
 
     syntax, FRAME(name)                                      ///
         [ LEVEL(real 90)                                     ///
           PREFIX(name) ]
 
-
-    /*
-        Stata convention:
-
-            level(90)
-
-        means a 90 percent band.
-
-        This differs from the R function, where level = 0.90.
-    */
 
     if `level' <= 0 | `level' >= 100 {
 
@@ -71,14 +39,8 @@ program define rdcomono_qplot, rclass
 
 
     /*
-        prefix() determines the names of the graphs.
-
-        Default:
-
-            rdcomono_q0
-            rdcomono_q1
-            rdcomono_compare
-            rdcomono_qplots
+        Determines the names of the graphs.
+        Default: rdcomono
     */
 
     if "`prefix'" == "" {
@@ -108,7 +70,7 @@ program define rdcomono_qplot, rclass
 
 
     /******************************************************************
-    2. Verify that the requested bootstrap frame exists
+        Verify that the requested bootstrap frame exists
     ******************************************************************/
 
     capture frame `frame': describe
@@ -124,7 +86,7 @@ program define rdcomono_qplot, rclass
 
 
     /******************************************************************
-    3. Verify that this is an rdcomono bootstrap frame
+        Verify that this is an rdcomono bootstrap frame
     ******************************************************************/
 
     /*
@@ -176,19 +138,11 @@ program define rdcomono_qplot, rclass
 
 
     /******************************************************************
-    4. Find the bootstrap q0 and q1 variables
+        Find the bootstrap q0 and q1 variables
     ******************************************************************/
 
     /*
-        First find everything beginning with _rdm_q0_.
-
-        This returns
-
-            _rdm_q0_grid
-            _rdm_q0_1
-            _rdm_q0_2
-            ...
-
+        Find everything beginning with _rdm_q0_.
         Remove _rdm_q0_grid so that only bootstrap draws remain.
     */
 
@@ -222,7 +176,8 @@ program define rdcomono_qplot, rclass
 
 
     /*
-        Do the same thing for q1.
+        Find everything beginning with _rdm_q1_.
+        Remove _rdm_q1_grid so that only bootstrap draws remain.
     */
 
     capture frame `frame': ds _rdm_q1_*
@@ -251,31 +206,27 @@ program define rdcomono_qplot, rclass
 
         exit 111
     }
-
-
     /*
-        rdcomono should generate one q0 curve and one q1 curve for
-        every bootstrap replication.
-
-        If these numbers differ, something is wrong with the bootstrap
-        frame.
+        q0 and q1 should have the same number of
+        bootstrap replications.
     */
 
     if `q0_reps' != `q1_reps' {
 
         display as error ///
-            "q0 and q1 have different numbers of bootstrap draws"
+            "q0 and q1 have different numbers of bootstrap replications"
+
+        display as error ///
+            "q0 replications: `q0_reps'; q1 replications: `q1_reps'"
 
         exit 498
     }
 
-
     local reps = `q0_reps'
 
 
-
     /******************************************************************
-    5. Check that valid q grids exist
+        Check that valid q grids exist
     ******************************************************************/
 
     frame `frame': quietly count if        ///
@@ -312,18 +263,11 @@ program define rdcomono_qplot, rclass
 
 
     /******************************************************************
-    6. Construct temporary frames
+        Construct temporary frames
     ******************************************************************/
 
     /*
-        We never modify the user's bootstrap frame.
-
-        Instead, make temporary copies:
-
-            q0frame
-            q1frame
-
-        These copies will be reshaped and transformed for plotting.
+        temporary copies: q0frame, q1frame
     */
 
     tempname q0frame q1frame compareframe
@@ -331,88 +275,28 @@ program define rdcomono_qplot, rclass
     frame copy `frame' `q0frame'
     frame copy `frame' `q1frame'
 
-
-    /*
-        Temporary files are used only to build the comparison plot.
-
-        They disappear automatically when this command finishes.
-    */
-
     tempfile q0_compare_data
     tempfile q1_compare_data
 
 
 
     /******************************************************************
-    7. Construct q0 plot data
+        Construct q0 plot data
     ******************************************************************/
-
-    /*
-        q0 maps
-
-            E[Y(1)|X]  ->  E[Y(0)|X].
-
-        Therefore:
-
-            horizontal axis = q0 input
-            vertical axis   = q0 estimate
-    */
-
-
-    /*
-        Keep only valid grid rows.
-    */
 
     frame `q0frame': keep if                ///
         !missing(_rdm_q0_grid) &            ///
         !missing(_rdm_q0)
 
-
-    /*
-        Give the original grid and estimator readable names.
-    */
-
     frame `q0frame': rename _rdm_q0_grid q0_input
     frame `q0frame': rename _rdm_q0      q0_estimate
-
-
-    /*
-        Retain only the variables needed for q0 inference.
-    */
 
     frame `q0frame': keep                  ///
         q0_input                           ///
         q0_estimate                        ///
         `q0_bootvars'
 
-
-    /*
-        Each q0 grid location needs an identifier before reshape.
-    */
-
     frame `q0frame': generate long q0_point = _n
-
-
-
-    /******************************************************************
-    8. Reshape q0 bootstrap curves
-    ******************************************************************/
-
-    /*
-        Before reshape, we have
-
-            q0_point   q0_input  q0_estimate   _rdm_q0_1 ...
-                1          y1       q0(y1)        q0^1(y1)
-                2          y2       q0(y2)        q0^1(y2)
-                ...
-
-        reshape long turns this into
-
-            q0_point   rep   q0_input   q0_estimate   _rdm_q0_
-                1       1       y1         q0(y1)       q0^1(y1)
-                1       2       y1         q0(y1)       q0^2(y1)
-                ...
-    */
 
     frame `q0frame': reshape long _rdm_q0_, ///
         i(q0_point)                          ///
@@ -421,43 +305,16 @@ program define rdcomono_qplot, rclass
 
 
     /******************************************************************
-    9. Calculate q0 pointwise bootstrap band
+        Calculate q0 pointwise bootstrap band
     ******************************************************************/
-
-    /*
-        For bootstrap draw b calculate
-
-            |q0_b(y) - q0_hat(y)|.
-    */
 
     frame `q0frame': generate double q0_absdev = ///
         abs(_rdm_q0_ - q0_estimate)
 
-
-    /*
-        At each grid point find the requested percentile of the
-        absolute bootstrap deviations.
-
-        For level(90), for example,
-
-            q0_conf(y)
-
-        is the 90th percentile of the bootstrap deviations.
-    */
-
     frame `q0frame': bysort q0_point: egen double q0_conf = ///
         pctile(q0_absdev), p(`level')
 
-
-    /*
-        After computing the percentile we no longer need one row per
-        bootstrap replication.
-
-        Keep one row for each q0 evaluation point.
-    */
-
     frame `q0frame': bysort q0_point: keep if _n == 1
-
 
     /*
         Pointwise lower and upper confidence-band endpoints.
@@ -487,7 +344,7 @@ program define rdcomono_qplot, rclass
 
 
     /******************************************************************
-    10. Obtain q0 support endpoints
+        Obtain q0 support endpoints
     ******************************************************************/
 
     frame `q0frame': quietly summarize q0_input, meanonly
@@ -510,7 +367,7 @@ program define rdcomono_qplot, rclass
 
 
     /******************************************************************
-    11. Plot q0
+        Plot q0
     ******************************************************************/
 
     /*
@@ -519,8 +376,6 @@ program define rdcomono_qplot, rclass
             1. bootstrap confidence region
             2. estimated q0
             3. 45-degree line
-
-        gs10 is used for the bootstrap region.
     */
 
     frame `q0frame': twoway                              ///
@@ -556,28 +411,8 @@ program define rdcomono_qplot, rclass
 
 
     /******************************************************************
-    12. Save q0 data needed for q0^{-1}
+        Save q0 data needed for q0^{-1}
     ******************************************************************/
-
-    /*
-        We do NOT numerically invert q0.
-
-        If
-
-            y0 = q0(y1),
-
-        then the inverse relationship can be plotted parametrically as
-
-            horizontal coordinate = q0(y1)
-            vertical coordinate   = y1.
-
-        Therefore:
-
-            EY0 = q0_estimate
-            EY1 = q0_input
-
-        gives the q0^{-1} curve in the comparison graph.
-    */
 
     frame `q0frame': generate double EY0 = q0_estimate
     frame `q0frame': generate double EY1 = q0_input
@@ -591,37 +426,22 @@ program define rdcomono_qplot, rclass
 
 
     /******************************************************************
-    13. Construct q1 plot data
+        Construct q1 plot data
     ******************************************************************/
-
-    /*
-        q1 maps
-
-            E[Y(0)|X]  ->  E[Y(1)|X].
-    */
 
     frame `q1frame': keep if                ///
         !missing(_rdm_q1_grid) &            ///
         !missing(_rdm_q1)
 
-
     frame `q1frame': rename _rdm_q1_grid q1_input
     frame `q1frame': rename _rdm_q1      q1_estimate
-
 
     frame `q1frame': keep                  ///
         q1_input                           ///
         q1_estimate                        ///
         `q1_bootvars'
 
-
     frame `q1frame': generate long q1_point = _n
-
-
-
-    /******************************************************************
-    14. Reshape q1 bootstrap curves
-    ******************************************************************/
 
     frame `q1frame': reshape long _rdm_q1_, ///
         i(q1_point)                          ///
@@ -630,7 +450,7 @@ program define rdcomono_qplot, rclass
 
 
     /******************************************************************
-    15. Calculate q1 pointwise bootstrap band
+        Calculate q1 pointwise bootstrap band
     ******************************************************************/
 
     frame `q1frame': generate double q1_absdev = ///
@@ -660,7 +480,7 @@ program define rdcomono_qplot, rclass
 
 
     /******************************************************************
-    16. Obtain q1 support endpoints
+        Obtain q1 support endpoints
     ******************************************************************/
 
     frame `q1frame': quietly summarize q1_input, meanonly
@@ -683,7 +503,7 @@ program define rdcomono_qplot, rclass
 
 
     /******************************************************************
-    17. Plot q1
+        Plot q1
     ******************************************************************/
 
     frame `q1frame': twoway                              ///
@@ -719,15 +539,8 @@ program define rdcomono_qplot, rclass
 
 
     /******************************************************************
-    18. Save q1 data for comparison graph
+        Save q1 data for comparison graph
     ******************************************************************/
-
-    /*
-        q1 already has the orientation needed for the comparison:
-
-            horizontal = E[Y(0)|X]
-            vertical   = E[Y(1)|X].
-    */
 
     frame `q1frame': generate double EY0 = q1_input
     frame `q1frame': generate double EY1 = q1_estimate
@@ -741,16 +554,8 @@ program define rdcomono_qplot, rclass
 
 
     /******************************************************************
-    19. Construct comparison dataset
+        Construct comparison dataset
     ******************************************************************/
-
-    /*
-        function_id = 1:
-            q1
-
-        function_id = 2:
-            q0^{-1}
-    */
 
     frame create `compareframe'
 
@@ -763,29 +568,8 @@ program define rdcomono_qplot, rclass
 
 
     /******************************************************************
-    20. Find common support for q1 and q0^{-1}
+        Find common support for q1 and q0^{-1}
     ******************************************************************/
-
-    /*
-        This reproduces the R calculation
-
-            comp_x_min =
-                max(
-                    min(q1 x),
-                    min(q0 inverse x)
-                )
-
-            comp_x_max =
-                min(
-                    max(q1 x),
-                    max(q0 inverse x)
-                )
-    */
-
-
-    /*
-        q1 support.
-    */
 
     frame `compareframe': quietly summarize EY0 ///
         if function_id == 1, meanonly
@@ -793,21 +577,11 @@ program define rdcomono_qplot, rclass
     local q1_comp_min = r(min)
     local q1_comp_max = r(max)
 
-
-    /*
-        q0 inverse support.
-    */
-
     frame `compareframe': quietly summarize EY0 ///
         if function_id == 2, meanonly
 
     local q0inv_comp_min = r(min)
     local q0inv_comp_max = r(max)
-
-
-    /*
-        Intersection.
-    */
 
     local comp_x_min = max(                ///
         `q1_comp_min',                     ///
@@ -835,22 +609,8 @@ program define rdcomono_qplot, rclass
 
 
     /******************************************************************
-    21. Plot q1 versus q0^{-1}
+        Plot q1 versus q0^{-1}
     ******************************************************************/
-
-    /*
-        Under comonotonicity,
-
-            q1(y)
-
-        and
-
-            q0^{-1}(y)
-
-        should coincide over their common support.
-
-        This is the Stata counterpart of comp_plot in the R package.
-    */
 
     frame `compareframe': twoway                         ///
         (line EY1 EY0                                    ///
@@ -878,22 +638,18 @@ program define rdcomono_qplot, rclass
             2 "Estimated q0 inverse"))                   ///
         name(`compare_graph', replace)
 
-  /******************************************************************
-    22. Remove temporary frames
-    ******************************************************************/
 
-    /*
-        The source bootstrap frame is NOT modified or dropped.
-    */
+    /******************************************************************
+        Remove temporary frames
+    ******************************************************************/
 
     capture frame drop `q0frame'
     capture frame drop `q1frame'
     capture frame drop `compareframe'
 
 
-
     /******************************************************************
-    23. Return results
+        Return results
     ******************************************************************/
 
     return scalar level = `level'
@@ -907,23 +663,19 @@ program define rdcomono_qplot, rclass
 
     return local bootstrap_frame "`frame'"
 
-    return local q0_graph ///
-        "`q0_graph'"
+    return local q0_graph "`q0_graph'"
 
-    return local q1_graph ///
-        "`q1_graph'"
+    return local q1_graph "`q1_graph'"
 
-    return local comparison_graph ///
-        "`compare_graph'"
+    return local comparison_graph "`compare_graph'"
 
 
 
     /******************************************************************
-    25. Display summary
+        Display summary
     ******************************************************************/
 
-    display as text _newline ///
-        "rdcomono q-function plots"
+    display as text _newline  "rdcomono q-function plots"
 
     display as text ///
         "  bootstrap frame:      " ///
