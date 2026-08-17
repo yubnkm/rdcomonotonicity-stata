@@ -351,9 +351,4 @@ display as text "  output/toy_example/toy_support.png"
 display as text "  output/toy_example/toy_q0.png"
 display as text "  output/toy_example/toy_q1.png"
 display as text "  output/toy_example/toy_q0_q1.png"
-<<<<<<< HEAD
-*/
-=======
-=======
->>>>>>> Stashed changes
->>>>>>> 1bf87ed (empirical examples)
+
