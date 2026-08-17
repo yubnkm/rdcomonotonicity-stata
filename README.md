@@ -315,9 +315,9 @@ Important returned scalars include:
 | `r(estimate)`       | Estimated counterfactual policy effect          |
 | `r(conf_low)`       | Lower endpoint of bootstrap confidence interval |
 | `r(conf_high)`      | Upper endpoint of bootstrap confidence interval |
-| `r(N_supported)`    | Number of observations with (S=1)               |
+| `r(N_supported)`    | Number of observations with $$S=1$$               |
 | `r(num_affected)`   | Expected number affected by the policy          |
-| `r(affected_share)` | Affected share among observations with (S=1)    |
+| `r(affected_share)` | Affected share among observations with $$S=1$$    |
 | `r(bootstrap_reps)` | Number of bootstrap replications                |
 
 Because this is a simulation, the true counterfactual policy effect can also be calculated using the known conditional mean potential outcomes.
@@ -340,7 +340,7 @@ The estimated and true effects can then be compared with:
 display as text "True policy effect:      " as result %10.6f true_policy_effect
 
 display as text "Estimated policy effect: " as result %10.6f r(estimate)
-
+```
 --------------------------------------------------------------
 Counterfactual policy: frontier shifted upward by 0.05
 --------------------------------------------------------------
@@ -352,7 +352,7 @@ Observations with S = 1           :        824
 Number affected by policy         :         51
 Affected share among S = 1        :     0.0619
 --------------------------------------------------------------
-```
+
 
 Although the toy example uses a deterministic counterfactual treatment indicator, `policy()` may also contain treatment probabilities between zero and one.
 
