@@ -293,6 +293,13 @@ rdcomono_policy y,                            ///
     support(supported)                        ///
     bootframe(toy_bootstrap)                  ///
     level(90)
+
+scalar policy_estimate = r(estimate)
+scalar policy_ci_low = r(conf_low)
+scalar policy_ci_high = r(conf_high)
+scalar policy_identified_n = r(N_supported)
+scalar policy_num_affected = r(num_affected)
+scalar policy_affected_share = r(affected_share)
 ```
 
 The command also reports:
@@ -337,10 +344,24 @@ scalar true_policy_effect = r(mean)
 The estimated and true effects can then be compared with:
 
 ```stata
-display as text "True policy effect:      " as result %10.6f true_policy_effect
+quietly {
+	noisily display as text "{text}{hline 62}"
+	noisily display as text "Counterfactual policy: frontier shifted upward by 0.05"
+	noisily display as text "{text}{hline 62}"
+	
+    noisily display as text "True policy effect"                 _col(35) ": " as result %10.6f true_policy_effect
+    noisily display as text "Estimated policy effect"            _col(35) ": " as result %10.6f policy_estimate
+    noisily display as text "90% bootstrap confidence interval"  _col(35) ": [" as result %10.6f policy_ci_low as text ", " as result %10.6f policy_ci_high as text "]"
+    
+    noisily display as text _newline "Observations with S = 1"     _col(35) ": " as result %10.0f policy_identified_n
+    noisily display as text "Number affected by policy"          _col(35) ": " as result %10.0f policy_num_affected
+    noisily display as text "Affected share among S = 1"         _col(35) ": " as result %10.4f policy_affected_share
+	
+	noisily display as text "{text}{hline 62}"
 
-display as text "Estimated policy effect: " as result %10.6f r(estimate)
+}
 ```
+```text
 --------------------------------------------------------------
 Counterfactual policy: frontier shifted upward by 0.05
 --------------------------------------------------------------
@@ -352,7 +373,7 @@ Observations with S = 1           :        824
 Number affected by policy         :         51
 Affected share among S = 1        :     0.0619
 --------------------------------------------------------------
-
+```
 
 Although the toy example uses a deterministic counterfactual treatment indicator, `policy()` may also contain treatment probabilities between zero and one.
 
