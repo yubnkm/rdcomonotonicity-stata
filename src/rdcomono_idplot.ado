@@ -5,21 +5,7 @@ program define rdcomono_idplot, rclass
     /*
         Plot the region with identified conditional average treatment effects.
 
-        This is the Stata counterpart of the R function plot_idf_region().
-
         The command is available only for two-dimensional assignment variables.
-
-        Treatment status is represented by marker color.
-
-        Identification status is represented by marker shape:
-
-            support = 0   open circle
-            support = 1   x
-
-        Unlike the R function, this command does not require a
-        threshold_function(). rdcomono already uses an observed treatment
-        indicator, so treatment() supplies the treated/untreated region labels
-        directly.
     */
 
     syntax varlist(min=2 max=2 numeric) [if] [in],          ///
