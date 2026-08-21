@@ -107,33 +107,6 @@ label variable D  "Treatment"
 label variable y  "Observed outcome"
 ```
 
-The treatment rule can be visualized as follows:
-
-```stata
-twoway                                                   ///
-    (scatter x2 x1 if D == 0,                           ///
-        msymbol(Oh) msize(vsmall))                      ///
-    (scatter x2 x1 if D == 1,                           ///
-        msymbol(+) msize(vsmall))                       ///
-    (function y = 0.7 - 0.4*x, range(0 1)              ///
-        lwidth(medthick)),                              ///
-    title("Toy multivariate RDD")                       ///
-    subtitle("Treatment rule: X2 < 0.7 - 0.4 X1")      ///
-    xtitle("X1")                                        ///
-    ytitle("X2")                                        ///
-    xscale(range(0 1))                                  ///
-    yscale(range(0 1))                                  ///
-    xlabel(0(.2)1)                                      ///
-    ylabel(0(.2)1)                                      ///
-    legend(order(                                       ///
-        1 "Untreated"                                   ///
-        2 "Treated"                                     ///
-        3 "Frontier"))                                  ///
-    name(toy_design, replace)
-```
-
-<img src="output/toy_example/toy_design.png" width="60%">
-
 ### Estimate the extrapolation model
 
 `rdcomono` estimates the factual conditional mean outcome separately in the treated and untreated regions.
