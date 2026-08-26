@@ -372,6 +372,8 @@ program define rdcomono, rclass
         g1_boundary is constructed for untreated observations near the frontier.
     */
 
+    tempvar g0_boundary g1_boundary
+
     local boundary_xvars1
     local boundary_xvars0
 
@@ -384,8 +386,6 @@ program define rdcomono, rclass
         local boundary_xvars1 "`boundary_xvars1' `boundary_x1'"
         local boundary_xvars0 "`boundary_xvars0' `boundary_x0'"
     }
-
-    tempvar g0_boundary g1_boundary
 
     quietly _rdcomono_localpoly `depvar' `xvars'                 ///
         if `touse' & `treatment' == 0,                          ///

@@ -126,18 +126,21 @@ program define _rdcomono_bootstrap_refit, rclass
 
     /******************************************************************
     Evaluation copies of X
-
-    These are nonmissing only for the estimation observations.
     ******************************************************************/
 
-    local evaluation_xvars
+    local evaluation_xvars0
+    local evaluation_xvars1
 
     foreach x of local xvars {
-        tempvar evaluation_x
-        quietly generate double `evaluation_x' = `x' if `touse'
+        tempvar evaluation_x0 evaluation_x1
 
-        local evaluation_xvars ///
-            "`evaluation_xvars' `evaluation_x'"
+        quietly generate double `evaluation_x0' = `x' if `touse' & `treatment' == 0
+
+        quietly generate double `evaluation_x1' = `x' if `touse' & `treatment' == 1
+
+        local evaluation_xvars0 "`evaluation_xvars0' `evaluation_x0'"
+
+        local evaluation_xvars1 "`evaluation_xvars1' `evaluation_x1'"
     }
 
     /******************************************************************
@@ -153,7 +156,7 @@ program define _rdcomono_bootstrap_refit, rclass
 
     quietly _rdcomono_localpoly `depvar' `xvars'             ///
         if `touse' & `treatment' == 0,                       ///
-        at(`evaluation_xvars')                               ///
+        at(`evaluation_xvars0')                               ///
         generate(`g0_factual')                               ///
         bandwidth(`band0')                                   ///
         wvar(`wvar')                                         ///
@@ -163,7 +166,7 @@ program define _rdcomono_bootstrap_refit, rclass
 
     quietly _rdcomono_localpoly `depvar' `xvars'             ///
         if `touse' & `treatment' == 1,                       ///
-        at(`evaluation_xvars')                               ///
+        at(`evaluation_xvars1')                               ///
         generate(`g1_factual')                               ///
         bandwidth(`band1')                                   ///
         wvar(`wvar')                                         ///
@@ -181,13 +184,28 @@ program define _rdcomono_bootstrap_refit, rclass
 
     tempvar g0_boundary g1_boundary
 
+    local boundary_xvars1
+    local boundary_xvars0
+
+    foreach x of local xvars {
+        tempvar boundary_x1 boundary_x0
+
+        quietly generate double `boundary_x1' = `x' if `touse' & `treatment' == 1 & `w1' == 1
+
+        quietly generate double `boundary_x0' = `x' if `touse' & `treatment' == 0 & `w0' == 1
+
+        local boundary_xvars1 "`boundary_xvars1' `boundary_x1'"
+
+        local boundary_xvars0 "`boundary_xvars0' `boundary_x0'"
+    }
+
     /*
         g0 evaluated for treated observations, with the kernel centered
         at their nearest untreated observations.
     */
     quietly _rdcomono_localpoly `depvar' `xvars'             ///
         if `touse' & `treatment' == 0,                       ///
-        at(`evaluation_xvars')                               ///
+        at(`evaluation_xvars1')                               ///
         center(`nearest0')                                   ///
         generate(`g0_boundary')                              ///
         bandwidth(`band0')                                   ///
@@ -202,7 +220,7 @@ program define _rdcomono_bootstrap_refit, rclass
     */
     quietly _rdcomono_localpoly `depvar' `xvars'             ///
         if `touse' & `treatment' == 1,                       ///
-        at(`evaluation_xvars')                               ///
+        at(`evaluation_xvars0')                               ///
         center(`nearest1')                                   ///
         generate(`g1_boundary')                              ///
         bandwidth(`band1')                                   ///
