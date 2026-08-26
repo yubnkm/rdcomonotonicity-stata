@@ -180,18 +180,19 @@ program define rdcomono, rclass
         exit 2000
     }
 
-    /*
-        Evaluation copies of X are missing outside the estimation sample. This
-        makes if/in restrictions apply not only to training observations but also
-        to every prediction produced by the internal local-polynomial routine.
-    */
+    
     local p : word count `xvars'
-    local evaluation_xvars
+    local evaluation_xvars0
+    local evaluation_xvars1
 
     foreach x of local xvars {
-        tempvar evaluation_x
-        quietly generate double `evaluation_x' = `x' if `touse'
-        local evaluation_xvars "`evaluation_xvars' `evaluation_x'"
+        tempvar evaluation_x0 evaluation_x1
+
+        quietly generate double `evaluation_x0' = `x' if `touse' & `treatment' == 0
+        quietly generate double `evaluation_x1' = `x' if `touse' & `treatment' == 1
+
+        local evaluation_xvars0 "`evaluation_xvars0' `evaluation_x0'"
+        local evaluation_xvars1 "`evaluation_xvars1' `evaluation_x1'"
     }
 
     /*
@@ -207,8 +208,6 @@ program define rdcomono, rclass
         Three or more values:
             use the full list as cross-validation candidates in every stage.
 
-        The last two cases reproduce the MATLAB/R estimator. The one-value case
-        is a convenient fixed-bandwidth extension for testing and small examples.
     */
     local n_bandwidths : word count `bandwidth'
 
@@ -242,7 +241,7 @@ program define rdcomono, rclass
 
     quietly _rdcomono_localpoly `depvar' `xvars'                 ///
         if `touse' & `treatment' == 0,                          ///
-        at(`evaluation_xvars')                                  ///
+        at(`evaluation_xvars0')                                  ///
         generate(`g0_factual')                                  ///
         bandwidth(`bands0')                                     ///
         wvar(`wvar')                                            ///
@@ -260,7 +259,7 @@ program define rdcomono, rclass
 
     quietly _rdcomono_localpoly `depvar' `xvars'                 ///
         if `touse' & `treatment' == 1,                          ///
-        at(`evaluation_xvars')                                  ///
+        at(`evaluation_xvars1')                                  ///
         generate(`g1_factual')                                  ///
         bandwidth(`bands1')                                     ///
         wvar(`wvar')                                            ///
@@ -372,11 +371,25 @@ program define rdcomono, rclass
         g0_boundary is constructed for treated observations near the frontier;
         g1_boundary is constructed for untreated observations near the frontier.
     */
+
+    local boundary_xvars1
+    local boundary_xvars0
+
+    foreach x of local xvars{
+        tempvar boundary_x1 boundary_xv0
+
+        quietly generate double `boundary_x1' = `x' if `touse' & `treatment' == 1 & `W1' == 1
+        quietly generate double `boundary_x0' = `x' if `touse' & `treatment' == 0 & 'W0' == 0
+
+        local boundary_xvars1 "`boundary_xvars1' `boundary_x1'"
+        local boundary_xvars0 "`boundary_xvars0' `boundary_x0'"
+    }
+
     tempvar g0_boundary g1_boundary
 
     quietly _rdcomono_localpoly `depvar' `xvars'                 ///
         if `touse' & `treatment' == 0,                          ///
-        at(`evaluation_xvars')                                  ///
+        at(`evaluation_xvars1')                                  ///
         center(`nearest0_vars')                                 ///
         generate(`g0_boundary')                                 ///
         bandwidth(`band0_value')                    ///
@@ -387,7 +400,7 @@ program define rdcomono, rclass
 
     quietly _rdcomono_localpoly `depvar' `xvars'                 ///
         if `touse' & `treatment' == 1,                          ///
-        at(`evaluation_xvars')                                  ///
+        at(`evaluation_xvars0')                                  ///
         center(`nearest1_vars')                                 ///
         generate(`g1_boundary')                                 ///
         bandwidth(`band1_value')                    ///
