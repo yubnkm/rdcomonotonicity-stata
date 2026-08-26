@@ -123,6 +123,23 @@ graph export ///
 
 capture frame drop math_boot
 
+set rmsg on
+
+timer on 1
+
+rdcomono Y_math x_math x_read,                    ///
+    treatment(D)                                  ///
+    generate(y0_math y1_math S_math)              ///
+    bandwidth(0.2)                            ///
+    kernel(gaussian)                              ///
+    folds(5)                                      ///
+    order(1)                                      ///
+    bootstrap(0)                                ///
+    bootpoints(100)
+
+timer off 1
+timer list 1
+
 rdcomono Y_math x_math x_read,                    ///
     treatment(D)                                  ///
     generate(y0_math y1_math S_math)              ///
