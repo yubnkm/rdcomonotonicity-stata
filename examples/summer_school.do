@@ -139,6 +139,9 @@ rdcomono Y_math x_math x_read,                    ///
 timer off 1
 timer list 1
 
+drop y0_math y1_math S_math
+
+
 rdcomono Y_math x_math x_read,                    ///
     treatment(D)                                  ///
     generate(y0_math y1_math S_math)              ///

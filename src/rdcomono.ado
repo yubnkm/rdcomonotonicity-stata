@@ -377,36 +377,37 @@ program define rdcomono, rclass
     local boundary_xvars1
     local boundary_xvars0
 
-    foreach x of local xvars{
-        tempvar boundary_x1 boundary_xv0
+    foreach x of local xvars {
+        tempvar boundary_x1 boundary_x0
 
         quietly generate double `boundary_x1' = `x' if `touse' & `treatment' == 1 & `W1' == 1
-        quietly generate double `boundary_x0' = `x' if `touse' & `treatment' == 0 & `W0' == 0
+
+        quietly generate double `boundary_x0' = `x' if `touse' & `treatment' == 0 & `W0' == 1
 
         local boundary_xvars1 "`boundary_xvars1' `boundary_x1'"
         local boundary_xvars0 "`boundary_xvars0' `boundary_x0'"
     }
 
     quietly _rdcomono_localpoly `depvar' `xvars'                 ///
-        if `touse' & `treatment' == 0,                          ///
-        at(`evaluation_xvars1')                                  ///
-        center(`nearest0_vars')                                 ///
-        generate(`g0_boundary')                                 ///
-        bandwidth(`band0_value')                    ///
-        wvar(`wvar')                                            ///
-        kernel(`kernel')                                        ///
-        folds(`folds')                                          ///
+        if `touse' & `treatment' == 0,                           ///
+        at(`boundary_xvars1')                                    ///
+        center(`nearest0_vars')                                  ///
+        generate(`g0_boundary')                                  ///
+        bandwidth(`band0_value')                                 ///
+        wvar(`wvar')                                             ///
+        kernel(`kernel')                                         ///
+        folds(`folds')                                           ///
         order(`order')
 
     quietly _rdcomono_localpoly `depvar' `xvars'                 ///
-        if `touse' & `treatment' == 1,                          ///
-        at(`evaluation_xvars0')                                  ///
-        center(`nearest1_vars')                                 ///
-        generate(`g1_boundary')                                 ///
-        bandwidth(`band1_value')                    ///
-        wvar(`wvar')                                            ///
-        kernel(`kernel')                                        ///
-        folds(`folds')                                          ///
+        if `touse' & `treatment' == 1,                           ///
+        at(`boundary_xvars0')                                    ///
+        center(`nearest1_vars')                                  ///
+        generate(`g1_boundary')                                  ///
+        bandwidth(`band1_value')                                 ///
+        wvar(`wvar')                                             ///
+        kernel(`kernel')                                         ///
+        folds(`folds')                                           ///
         order(`order')
 
     /*

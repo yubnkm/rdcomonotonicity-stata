@@ -205,7 +205,7 @@ program define _rdcomono_bootstrap_refit, rclass
     */
     quietly _rdcomono_localpoly `depvar' `xvars'             ///
         if `touse' & `treatment' == 0,                       ///
-        at(`evaluation_xvars1')                               ///
+        at(`boundary_xvars1')                               ///
         center(`nearest0')                                   ///
         generate(`g0_boundary')                              ///
         bandwidth(`band0')                                   ///
@@ -220,7 +220,7 @@ program define _rdcomono_bootstrap_refit, rclass
     */
     quietly _rdcomono_localpoly `depvar' `xvars'             ///
         if `touse' & `treatment' == 1,                       ///
-        at(`evaluation_xvars0')                               ///
+        at(`boundary_xvars0')                               ///
         center(`nearest1')                                   ///
         generate(`g1_boundary')                              ///
         bandwidth(`band1')                                   ///
