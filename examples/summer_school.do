@@ -10,7 +10,7 @@ capture mkdir "output/summer_school"
 
 local datafile "examples/ssextract_karthik.csv"
 
-local B      = 10
+local B      = 100
 local points = 100
 local level  = 90
 local bands = 0.2
@@ -123,9 +123,6 @@ graph export ///
 
 capture frame drop math_boot
 
-set rmsg on
-
-timer on 1
 
 rdcomono Y_math x_math x_read,                    ///
     treatment(D)                                  ///
@@ -134,10 +131,9 @@ rdcomono Y_math x_math x_read,                    ///
     kernel(gaussian)                              ///
     folds(5)                                      ///
     order(1)                                      ///
-    bootstrap(0)
+    bootstrap(0)								///
+	timing
 	
-timer off 1
-timer list 1
 
 drop y0_math y1_math S_math
 
@@ -175,9 +171,8 @@ label variable tau_math "Estimated math CATE"
 * Math - q plots
 rdcomono_qplot,                         ///
     frame(math_boot)                    ///
-    level(`level')                      ///
-    prefix(math)                        ///
-    nocombine
+    level(0.9)                      ///
+    prefix(math)                       
 
 graph export ///
     "output/summer_school/q0_math.png", ///
@@ -246,8 +241,7 @@ label variable tau_read "Estimated reading CATE"
 rdcomono_qplot,                         ///
     frame(read_boot)                    ///
     level(`level')                      ///
-    prefix(read)                        ///
-    nocombine
+    prefix(read)                        
 
 graph export ///
     "output/summer_school/q0_read.png", ///
@@ -471,7 +465,7 @@ graph export ///
 /**********************************************************************
     Final summary
 **********************************************************************/
-queitly{
+quietly {
 noisily display as text _newline "============================================================"
 noisily display as text "Summer-school empirical application completed"
 noisily display as text "============================================================"

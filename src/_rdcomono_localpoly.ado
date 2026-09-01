@@ -347,6 +347,7 @@ real colvector _rdcomono_kernel_weights(
 
 /**********************************************************************
     Core multivariate local-polynomial predictor
+    Identical (X_at, X_center) pairs are evaluated only once.
 **********************************************************************/
 
 real colvector _rdcomono_poly_predict(
@@ -362,11 +363,25 @@ real colvector _rdcomono_poly_predict(
 {
     real scalar i
     real scalar n_eval
+    real scalar n_unique
+    real scalar p
 
     real matrix training_basis
     real matrix evaluation_basis
 
+    real matrix pair_matrix
+    real matrix pair_sorted
+
+    real matrix X_at_unique
+    real matrix X_center_unique
+
+    real colvector sorting_index
+    real colvector group_sorted
+    real colvector unique_row_position
+
     real colvector predictions
+    real colvector unique_predictions
+
     real colvector distance
     real colvector kernel_weight
     real colvector total_weight
@@ -375,27 +390,125 @@ real colvector _rdcomono_poly_predict(
     real colvector weighted_outcome_crossproduct
     real colvector beta
 
+
+    /** 1. Identify unique (X_at, X_center) pairs **/
+
+    n_eval = rows(X_at)
+    p = cols(X_at)
+
+    pair_matrix =
+        (
+            X_at,
+            X_center
+        )
+
+    sorting_index =
+        order(
+            pair_matrix,
+            1..cols(pair_matrix)
+        )
+
+    pair_sorted =
+        pair_matrix[sorting_index, .]
+
+
+    /*
+        group_sorted tells us which unique pair each sorted row belongs to.
+
+        unique_row_position stores the first row of every unique pair.
+    */
+
+    group_sorted =
+        J(n_eval, 1, 1)
+
+    unique_row_position =
+        J(n_eval, 1, .)
+
+    n_unique = 1
+
+    unique_row_position[1] = 1
+
+
+    for (i = 2; i <= n_eval; i++) {
+
+        if (
+            any(
+                pair_sorted[i, .]
+                :!=
+                pair_sorted[i - 1, .]
+            )
+        ) {
+
+            n_unique = n_unique + 1
+
+            unique_row_position[n_unique] = i
+        }
+
+        group_sorted[i] = n_unique
+    }
+
+
+    unique_row_position =
+        unique_row_position[1..n_unique]
+
+
+    X_at_unique =
+        pair_sorted[
+            unique_row_position,
+            1..p
+        ]
+
+
+    X_center_unique =
+        pair_sorted[
+            unique_row_position,
+            (p + 1)..(2 * p)
+        ]
+
+
+    /** 2. Construct polynomial bases
+
+        Training basis is unchanged.
+
+        Evaluation basis now only needs to be constructed at unique
+        evaluation points. **/
+
     training_basis =
         _rdcomono_polynomial_basis(
             X,
             exponents
         )
 
+
     evaluation_basis =
         _rdcomono_polynomial_basis(
-            X_at,
+            X_at_unique,
             exponents
         )
 
-    n_eval = rows(X_at)
-    predictions = J(n_eval, 1, .)
 
-    for (i = 1; i <= n_eval; i++) {
+    /** 3. Run local polynomial regression only for unique pairs **/
+
+    unique_predictions =
+        J(n_unique, 1, .)
+
+
+    for (i = 1; i <= n_unique; i++) {
 
         /*
-            Kernel weights depend on distance from X_center[i,.].
+            Kernel weights depend on X_center.
         */
-        distance = sqrt(rowsum((X :- X_center[i, .]) :^ 2))
+
+        distance =
+            sqrt(
+                rowsum(
+                    (
+                        X :-
+                        X_center_unique[i, .]
+                    ) :^ 2
+                )
+            )
+
 
         kernel_weight =
             _rdcomono_kernel_weights(
@@ -404,33 +517,32 @@ real colvector _rdcomono_poly_predict(
                 kernel
             )
 
+
         total_weight =
             sampling_weight :*
             kernel_weight
 
+
         /*
-            A compact-support kernel may assign zero weight to every
-            training observation at an evaluation center. In that case,
-            no local fit exists and the prediction remains missing.
+            No observations receive positive weight.
         */
+
         if (sum(total_weight) <= 0) {
             continue
         }
 
+
         /*
-            Weighted polynomial least squares:
-
-                beta = (B'WB)^+ B'WY.
-
-            qrsolve() provides a generalized QR solution and avoids
-            explicitly forming a matrix inverse.
+            Weighted local-polynomial regression.
         */
+
         weighted_crossproduct =
             cross(
                 training_basis,
                 total_weight,
                 training_basis
             )
+
 
         weighted_outcome_crossproduct =
             cross(
@@ -439,18 +551,33 @@ real colvector _rdcomono_poly_predict(
                 y
             )
 
+
         beta =
             qrsolve(
                 weighted_crossproduct,
                 weighted_outcome_crossproduct
             )
 
+
         /*
-            Evaluate the fitted polynomial at X_at[i,.].
+            Evaluate at X_at.
         */
-        predictions[i] =
-            evaluation_basis[i, .] * beta
+
+        unique_predictions[i] =
+            evaluation_basis[i, .] *
+            beta
     }
+
+
+    /** 4. Expand predictions back to the original observations **/
+
+    predictions =
+        J(n_eval, 1, .)
+
+
+    predictions[sorting_index] =
+        unique_predictions[group_sorted]
+
 
     return(predictions)
 }
