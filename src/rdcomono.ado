@@ -27,7 +27,8 @@ program define rdcomono, rclass
           ORDER(integer 1)                                  ///
           BOOTstrap(integer 0)                              ///
           BOOTFRAME(name)                                   ///
-          BOOTPOINTS(integer 100) ]
+          BOOTPOINTS(integer 100)                           ///
+          TIMING]
     /*
         The first variable is the outcome. The remaining variables are the
         assignment variables/covariates X.
@@ -180,18 +181,19 @@ program define rdcomono, rclass
         exit 2000
     }
 
-    /*
-        Evaluation copies of X are missing outside the estimation sample. This
-        makes if/in restrictions apply not only to training observations but also
-        to every prediction produced by the internal local-polynomial routine.
-    */
+    
     local p : word count `xvars'
-    local evaluation_xvars
+    local evaluation_xvars0
+    local evaluation_xvars1
 
     foreach x of local xvars {
-        tempvar evaluation_x
-        quietly generate double `evaluation_x' = `x' if `touse'
-        local evaluation_xvars "`evaluation_xvars' `evaluation_x'"
+        tempvar evaluation_x0 evaluation_x1
+
+        quietly generate double `evaluation_x0' = `x' if `touse' & `treatment' == 0
+        quietly generate double `evaluation_x1' = `x' if `touse' & `treatment' == 1
+
+        local evaluation_xvars0 "`evaluation_xvars0' `evaluation_x0'"
+        local evaluation_xvars1 "`evaluation_xvars1' `evaluation_x1'"
     }
 
     /*
@@ -207,8 +209,6 @@ program define rdcomono, rclass
         Three or more values:
             use the full list as cross-validation candidates in every stage.
 
-        The last two cases reproduce the MATLAB/R estimator. The one-value case
-        is a convenient fixed-bandwidth extension for testing and small examples.
     */
     local n_bandwidths : word count `bandwidth'
 
@@ -234,21 +234,38 @@ program define rdcomono, rclass
         exit 198
     }
 
+    if "`timing'" != "" {
+        timer clear 91
+        timer clear 92
+        timer clear 93
+        timer clear 94
+        timer clear 96
+        timer clear 97
+
+        timer on 96
+    }
+
     /*
         Stage 1: estimate factual conditional mean functions separately by D.
     */
     tempvar g0_factual g1_factual
     tempname band0_scalar band1_scalar
 
+if "`timing'" != "" {
+    timer on 91
+}
+
     quietly _rdcomono_localpoly `depvar' `xvars'                 ///
         if `touse' & `treatment' == 0,                          ///
-        at(`evaluation_xvars')                                  ///
+        at(`evaluation_xvars0')                                  ///
         generate(`g0_factual')                                  ///
         bandwidth(`bands0')                                     ///
         wvar(`wvar')                                            ///
         kernel(`kernel')                                        ///
         folds(`folds')                                          ///
         order(`order')
+
+
 
     scalar `band0_scalar' = r(bandwidth)
 
@@ -260,7 +277,7 @@ program define rdcomono, rclass
 
     quietly _rdcomono_localpoly `depvar' `xvars'                 ///
         if `touse' & `treatment' == 1,                          ///
-        at(`evaluation_xvars')                                  ///
+        at(`evaluation_xvars1')                                  ///
         generate(`g1_factual')                                  ///
         bandwidth(`bands1')                                     ///
         wvar(`wvar')                                            ///
@@ -268,6 +285,9 @@ program define rdcomono, rclass
         folds(`folds')                                          ///
         order(`order')
 
+if "`timing'" != "" {
+    timer off 91
+}
     scalar `band1_scalar' = r(bandwidth)
 
     if missing(scalar(`band1_scalar')) {
@@ -301,6 +321,10 @@ program define rdcomono, rclass
     quietly generate double `distance0' = .
     quietly generate double `distance1' = .
 
+if "`timing'" != "" {
+    timer on 92
+}
+
     mata: _rdcomono_nn_op_driver(                    ///
         "`xvars'",                                              ///
         "`treatment'",                                         ///
@@ -310,6 +334,10 @@ program define rdcomono, rclass
         "`distance0'",                                         ///
         "`distance1'"                                          ///
     )
+
+if "`timing'" != "" {
+    timer off 92
+}
 
     /*
         The frontier-neighborhood radius is omega times the relevant
@@ -372,29 +400,54 @@ program define rdcomono, rclass
         g0_boundary is constructed for treated observations near the frontier;
         g1_boundary is constructed for untreated observations near the frontier.
     */
+
     tempvar g0_boundary g1_boundary
 
-    quietly _rdcomono_localpoly `depvar' `xvars'                 ///
-        if `touse' & `treatment' == 0,                          ///
-        at(`evaluation_xvars')                                  ///
-        center(`nearest0_vars')                                 ///
-        generate(`g0_boundary')                                 ///
-        bandwidth(`band0_value')                    ///
-        wvar(`wvar')                                            ///
-        kernel(`kernel')                                        ///
-        folds(`folds')                                          ///
-        order(`order')
+    local boundary_xvars1
+    local boundary_xvars0
+
+    foreach x of local xvars {
+        tempvar boundary_x1 boundary_x0
+
+        quietly generate double `boundary_x1' = `x' if `touse' & `treatment' == 1 & `W1' == 1
+
+        quietly generate double `boundary_x0' = `x' if `touse' & `treatment' == 0 & `W0' == 1
+
+        local boundary_xvars1 "`boundary_xvars1' `boundary_x1'"
+        local boundary_xvars0 "`boundary_xvars0' `boundary_x0'"
+    }
+
+if "`timing'" != "" {
+    timer on 93
+}
 
     quietly _rdcomono_localpoly `depvar' `xvars'                 ///
-        if `touse' & `treatment' == 1,                          ///
-        at(`evaluation_xvars')                                  ///
-        center(`nearest1_vars')                                 ///
-        generate(`g1_boundary')                                 ///
-        bandwidth(`band1_value')                    ///
-        wvar(`wvar')                                            ///
-        kernel(`kernel')                                        ///
-        folds(`folds')                                          ///
+        if `touse' & `treatment' == 0,                           ///
+        at(`boundary_xvars1')                                    ///
+        center(`nearest0_vars')                                  ///
+        generate(`g0_boundary')                                  ///
+        bandwidth(`band0_value')                                 ///
+        wvar(`wvar')                                             ///
+        kernel(`kernel')                                         ///
+        folds(`folds')                                           ///
         order(`order')
+
+
+
+    quietly _rdcomono_localpoly `depvar' `xvars'                 ///
+        if `touse' & `treatment' == 1,                           ///
+        at(`boundary_xvars0')                                    ///
+        center(`nearest1_vars')                                  ///
+        generate(`g1_boundary')                                  ///
+        bandwidth(`band1_value')                                 ///
+        wvar(`wvar')                                             ///
+        kernel(`kernel')                                         ///
+        folds(`folds')                                           ///
+        order(`order')
+
+if "`timing'" != "" {
+    timer off 93
+}
 
     /*
         Estimated domains of q1 and q0.
@@ -436,6 +489,10 @@ program define rdcomono, rclass
     tempvar q1_at_g0 q0_at_g1
     tempname q1_band_scalar q0_band_scalar
 
+if "`timing'" != "" {
+    timer on 94
+}
+
     quietly _rdcomono_localpoly `depvar' `g0_boundary'          ///
         if `touse' & `treatment' == 1 & `W1' == 1,             ///
         at(`g0_factual')                                        ///
@@ -445,6 +502,8 @@ program define rdcomono, rclass
         kernel(`kernel')                                        ///
         folds(`folds')                                          ///
         order(`order')
+
+
 
     scalar `q1_band_scalar' = r(bandwidth)
 
@@ -463,7 +522,10 @@ program define rdcomono, rclass
         kernel(`kernel')                                        ///
         folds(`folds')                                          ///
         order(`order')
-
+        
+if "`timing'" != "" {
+    timer off 94
+}
     scalar `q0_band_scalar' = r(bandwidth)
 
     if missing(scalar(`q0_band_scalar')) {
@@ -519,7 +581,9 @@ program define rdcomono, rclass
     /******************************************************************
     Multiplier bootstrap
     ******************************************************************/
-
+if "`timing'" != "" {
+    timer on 96
+}
     local bootstrap_frame ""
 
     tempname bootstrap_q0_bands
@@ -582,9 +646,124 @@ program define rdcomono, rclass
         matrix `bootstrap_q1_bands' = r(q1_bands)
     }
 
+if "`timing'" != "" {
+    timer off 96
+}
+
+if "`timing'" != "" {
+
+    quietly timer list
+
+    local time_factual = r(t91)
+    local time_nn = r(t92)
+    local time_boundary = r(t93)
+    local time_q = r(t94)
+    local time_point = r(t96)
+
+    local time_localpoly = ///
+        `time_factual' + ///
+        `time_boundary' + ///
+        `time_q'
+
+    local share_localpoly = ///
+        100 * `time_localpoly' / `time_point'
+
+    local share_nn = ///
+        100 * `time_nn' / `time_point'
+
+    display as text _newline ///
+        "============================================================"
+
+    display as text ///
+        "rdcomono timing diagnostics"
+
+    display as text ///
+        "============================================================"
+
+    display as text ///
+        "Point estimator total:      " ///
+        as result %10.3f `time_point' ///
+        as text " sec"
+
+    display as text ///
+        "  factual local poly:       " ///
+        as result %10.3f `time_factual' ///
+        as text " sec"
+
+    display as text ///
+        "  nearest neighbor:         " ///
+        as result %10.3f `time_nn' ///
+        as text " sec"
+
+    display as text ///
+        "  boundary local poly:      " ///
+        as result %10.3f `time_boundary' ///
+        as text " sec"
+
+    display as text ///
+        "  q local poly:             " ///
+        as result %10.3f `time_q' ///
+        as text " sec"
+
+    display as text ///
+        "Total local poly:           " ///
+        as result %10.3f `time_localpoly' ///
+        as text " sec"
+
+    display as text ///
+        "Local-poly share:           " ///
+        as result %9.1f `share_localpoly' ///
+        as text "%"
+
+    display as text ///
+        "Nearest-neighbor share:     " ///
+        as result %9.1f `share_nn' ///
+        as text "%"
+
+    if `bootstrap' > 0 {
+
+        local time_bootstrap = r(t97)
+        local time_bootrep = ///
+            `time_bootstrap' / `bootstrap'
+
+        display as text ///
+            "Bootstrap total:          " ///
+            as result %10.3f `time_bootstrap' ///
+            as text " sec"
+
+        display as text ///
+            "Bootstrap sec / rep:      " ///
+            as result %10.3f `time_bootrep' ///
+            as text " sec"
+    }
+}
+
     /*
         Returned results for testing and later postestimation commands.
     */
+
+if "`timing'" != "" {
+
+    return scalar time_point = `time_point'
+    return scalar time_factual = `time_factual'
+    return scalar time_nn = `time_nn'
+    return scalar time_boundary = `time_boundary'
+    return scalar time_q = `time_q'
+    return scalar time_localpoly = `time_localpoly'
+
+    return scalar share_localpoly = ///
+        `share_localpoly' / 100
+
+    return scalar share_nn = ///
+        `share_nn' / 100
+
+    if `bootstrap' > 0 {
+        return scalar time_bootstrap = `time_bootstrap'
+        return scalar time_bootrep = `time_bootrep'
+    }
+}
+return list
+
     return scalar N = `n_complete'
     return scalar N0 = `n0'
     return scalar N1 = `n1'
