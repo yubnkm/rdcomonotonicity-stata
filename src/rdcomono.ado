@@ -381,7 +381,7 @@ program define rdcomono, rclass
         tempvar boundary_x1 boundary_xv0
 
         quietly generate double `boundary_x1' = `x' if `touse' & `treatment' == 1 & `W1' == 1
-        quietly generate double `boundary_x0' = `x' if `touse' & `treatment' == 0 & 'W0' == 0
+        quietly generate double `boundary_x0' = `x' if `touse' & `treatment' == 0 & `W0' == 0
 
         local boundary_xvars1 "`boundary_xvars1' `boundary_x1'"
         local boundary_xvars0 "`boundary_xvars0' `boundary_x0'"

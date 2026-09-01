@@ -134,9 +134,8 @@ rdcomono Y_math x_math x_read,                    ///
     kernel(gaussian)                              ///
     folds(5)                                      ///
     order(1)                                      ///
-    bootstrap(0)                                ///
-    bootpoints(100)
-
+    bootstrap(0)
+	
 timer off 1
 timer list 1
 
